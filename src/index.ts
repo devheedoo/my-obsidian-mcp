@@ -233,6 +233,149 @@ server.tool("list_tags", {}, async () => {
   };
 });
 
+function buildNoteContent(
+  content: string,
+  frontmatter?: Record<string, unknown>,
+): string {
+  if (frontmatter && Object.keys(frontmatter).length > 0) {
+    return matter.stringify(content, frontmatter);
+  }
+  return content;
+}
+
+server.tool(
+  "create_note",
+  {
+    path: z
+      .string()
+      .describe(
+        "Path relative to vault root, e.g. 'Daily/2026-02-26.md'. Must end with .md",
+      ),
+    content: z.string().describe("Markdown body of the note"),
+    frontmatter: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe("Optional YAML frontmatter as a JSON object"),
+  },
+  async ({ path: rel, content, frontmatter }) => {
+    if (!rel.toLowerCase().endsWith(".md")) {
+      return {
+        content: [{ type: "text", text: "Error: path must end with .md" }],
+        isError: true,
+      };
+    }
+
+    const abs = assertInsideVault(rel);
+
+    try {
+      await fs.access(abs);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: file already exists at '${rel}'. Use update_note to overwrite.`,
+          },
+        ],
+        isError: true,
+      };
+    } catch {
+      // file doesn't exist — proceed
+    }
+
+    await fs.mkdir(path.dirname(abs), { recursive: true });
+    const text = buildNoteContent(content, frontmatter);
+    await fs.writeFile(abs, text, "utf8");
+
+    return {
+      content: [{ type: "text", text: `Created: ${rel}` }],
+    };
+  },
+);
+
+server.tool(
+  "update_note",
+  {
+    path: z
+      .string()
+      .describe("Path relative to vault root, e.g. 'Daily/2026-02-26.md'"),
+    content: z.string().describe("New markdown body of the note"),
+    frontmatter: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        "Optional YAML frontmatter as a JSON object. If omitted, existing frontmatter is preserved.",
+      ),
+  },
+  async ({ path: rel, content, frontmatter }) => {
+    const abs = assertInsideVault(rel);
+
+    try {
+      await fs.access(abs);
+    } catch {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: file not found at '${rel}'. Use create_note to create a new note.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    let fm = frontmatter;
+    if (!fm) {
+      const existing = await fs.readFile(abs, "utf8");
+      const parsed = matter(existing);
+      fm = parsed.data;
+    }
+
+    const text = buildNoteContent(content, fm);
+    await fs.writeFile(abs, text, "utf8");
+
+    return {
+      content: [{ type: "text", text: `Updated: ${rel}` }],
+    };
+  },
+);
+
+server.tool(
+  "append_to_note",
+  {
+    path: z
+      .string()
+      .describe("Path relative to vault root, e.g. 'Daily/2026-02-26.md'"),
+    content: z
+      .string()
+      .describe("Markdown content to append at the end of the note"),
+  },
+  async ({ path: rel, content }) => {
+    const abs = assertInsideVault(rel);
+
+    try {
+      await fs.access(abs);
+    } catch {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: file not found at '${rel}'. Use create_note to create a new note.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const existing = await fs.readFile(abs, "utf8");
+    const separator = existing.endsWith("\n") ? "" : "\n";
+    await fs.writeFile(abs, existing + separator + content, "utf8");
+
+    return {
+      content: [{ type: "text", text: `Appended to: ${rel}` }],
+    };
+  },
+);
+
 /** Connect transport **/
 const transport = new StdioServerTransport();
 await server.connect(transport);
