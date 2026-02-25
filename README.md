@@ -1,9 +1,11 @@
 # my-obsidian-mcp
 
-Obsidian Vault를 읽어주는 MCP(Model Context Protocol) 서버입니다.
-Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian 노트를 검색하고 조회할 수 있습니다.
+Obsidian Vault를 읽고 쓸 수 있는 MCP(Model Context Protocol) 서버입니다.
+Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian 노트를 검색, 조회, 생성, 수정할 수 있습니다.
 
 ## Tools
+
+### 읽기
 
 | Tool | 설명 |
 | --- | --- |
@@ -12,6 +14,14 @@ Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian
 | `search_notes` | 키워드로 노트를 검색합니다. ripgrep이 있으면 우선 사용하고, 없으면 JS 스캔으로 폴백합니다. |
 | `get_backlinks` | 특정 페이지를 `[[wikilink]]`로 참조하는 노트 목록을 반환합니다. |
 | `list_tags` | Vault 전체의 태그(frontmatter + 인라인 `#tag`)를 수집하여 반환합니다. |
+
+### 쓰기
+
+| Tool | 설명 |
+| --- | --- |
+| `create_note` | 새 노트를 생성합니다. 이미 존재하는 파일이면 에러를 반환합니다. 중간 디렉토리는 자동 생성됩니다. |
+| `update_note` | 기존 노트를 덮어씁니다. frontmatter를 생략하면 기존 frontmatter가 유지됩니다. |
+| `append_to_note` | 기존 노트 끝에 내용을 추가합니다. |
 
 ## 설치
 
