@@ -1,0 +1,238 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import { spawn } from "node:child_process";
+
+import fg from "fast-glob";
+import matter from "gray-matter";
+import { z } from "zod";
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+/**
+ * Usage:
+ *   tsx src/index.ts /abs/path/to/ObsidianVault
+ */
+const vaultRoot = process.argv[2];
+if (!vaultRoot) {
+  console.error("Missing vault path. Usage: obsidian-mcp <vaultRoot>");
+  process.exit(1);
+}
+const VAULT = path.resolve(vaultRoot);
+
+const server = new McpServer({ name: "obsidian-mcp", version: "0.1.0" });
+
+function assertInsideVault(p: string) {
+  const abs = path.resolve(VAULT, p);
+  if (!abs.startsWith(VAULT + path.sep) && abs !== VAULT) {
+    throw new Error("Path escapes vault");
+  }
+  return abs;
+}
+
+async function listMarkdownFiles() {
+  return fg(["**/*.md"], { cwd: VAULT, dot: true, onlyFiles: true }).then(
+    (xs) => xs.sort((a, b) => a.localeCompare(b)),
+  );
+}
+
+function extractWikiLinks(markdown: string): string[] {
+  // [[Page]] or [[Page|Alias]]
+  const out: string[] = [];
+  const re = /\[\[([^\]\|#]+)(?:\|[^\]]+)?\]\]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(markdown))) out.push(m[1].trim());
+  return out;
+}
+
+function extractInlineTags(markdown: string): string[] {
+  // very simple: #tag (avoid # in code fences? keep simple for v1)
+  const out = new Set<string>();
+  const re = /(^|\s)#([A-Za-z0-9/_-]+)\b/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(markdown))) out.add(m[2]);
+  return [...out];
+}
+
+async function readNote(relPath: string) {
+  const abs = assertInsideVault(relPath);
+  const text = await fs.readFile(abs, "utf8");
+  const parsed = matter(text);
+  return {
+    path: relPath,
+    frontmatter: parsed.data ?? {},
+    content: parsed.content ?? "",
+    raw: text,
+  };
+}
+
+/** Tools **/
+
+server.tool(
+  "list_notes",
+  { glob: z.string().optional().describe("Optional glob like '**/*.md'") },
+  async ({ glob }) => {
+    const patterns = glob ? [glob] : ["**/*.md"];
+    const files = await fg(patterns, {
+      cwd: VAULT,
+      dot: true,
+      onlyFiles: true,
+    });
+    const md = files.filter((f) => f.toLowerCase().endsWith(".md")).sort();
+    return { content: [{ type: "text", text: JSON.stringify(md, null, 2) }] };
+  },
+);
+
+server.tool(
+  "get_note",
+  {
+    path: z
+      .string()
+      .describe("Path relative to vault root, e.g. 'Daily/2026-02-26.md'"),
+  },
+  async ({ path: rel }) => {
+    const note = await readNote(rel);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              path: note.path,
+              frontmatter: note.frontmatter,
+              content: note.content,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
+  },
+);
+
+server.tool(
+  "search_notes",
+  {
+    query: z.string().min(1),
+    limit: z.number().int().positive().max(200).default(50),
+    caseSensitive: z.boolean().default(false),
+  },
+  async ({ query, limit, caseSensitive }) => {
+    // Prefer ripgrep if available (fast). Fall back to JS scan.
+    const rgArgs = [
+      "--no-heading",
+      "--with-filename",
+      "--line-number",
+      "--column",
+      "--max-count",
+      String(limit),
+      ...(caseSensitive ? [] : ["-i"]),
+      query,
+      ".",
+    ];
+
+    try {
+      const out = await new Promise<string>((resolve, reject) => {
+        const p = spawn("rg", rgArgs, { cwd: VAULT });
+        let buf = "";
+        let err = "";
+        p.stdout.on("data", (d) => (buf += String(d)));
+        p.stderr.on("data", (d) => (err += String(d)));
+        p.on("close", (code) => {
+          // rg returns code 1 when no matches
+          if (code === 0 || code === 1) return resolve(buf.trim());
+          reject(new Error(err || `rg exited with ${code}`));
+        });
+      });
+
+      return { content: [{ type: "text", text: out || "" }] };
+    } catch {
+      // fallback: naive scan (slower)
+      const files = await listMarkdownFiles();
+      const results: any[] = [];
+      const q = caseSensitive ? query : query.toLowerCase();
+
+      for (const f of files) {
+        const abs = assertInsideVault(f);
+        const text = await fs.readFile(abs, "utf8");
+        const hay = caseSensitive ? text : text.toLowerCase();
+        if (!hay.includes(q)) continue;
+
+        const lines = text.split("\n");
+        for (let i = 0; i < lines.length; i++) {
+          const lineHay = caseSensitive ? lines[i] : lines[i].toLowerCase();
+          const idx = lineHay.indexOf(q);
+          if (idx >= 0) {
+            results.push({
+              file: f,
+              line: i + 1,
+              col: idx + 1,
+              text: lines[i],
+            });
+            if (results.length >= limit) break;
+          }
+        }
+        if (results.length >= limit) break;
+      }
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(results, null, 2) }],
+      };
+    }
+  },
+);
+
+server.tool(
+  "get_backlinks",
+  {
+    target: z
+      .string()
+      .describe("Target page name, e.g. 'My Note' (matches [[My Note]])"),
+  },
+  async ({ target }) => {
+    const files = await listMarkdownFiles();
+    const backlinks: { from: string; matches: string[] }[] = [];
+
+    for (const f of files) {
+      const abs = assertInsideVault(f);
+      const text = await fs.readFile(abs, "utf8");
+      const links = extractWikiLinks(text);
+      const hits = links.filter((x) => x === target);
+      if (hits.length) backlinks.push({ from: f, matches: hits });
+    }
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(backlinks, null, 2) }],
+    };
+  },
+);
+
+server.tool("list_tags", {}, async () => {
+  const files = await listMarkdownFiles();
+  const tags = new Set<string>();
+
+  for (const f of files) {
+    const abs = assertInsideVault(f);
+    const text = await fs.readFile(abs, "utf8");
+    const parsed = matter(text);
+
+    // frontmatter tags: string | string[]
+    const fmTags = (parsed.data as any)?.tags;
+    if (typeof fmTags === "string") tags.add(fmTags);
+    if (Array.isArray(fmTags))
+      fmTags.forEach((t) => typeof t === "string" && tags.add(t));
+
+    extractInlineTags(parsed.content).forEach((t) => tags.add(t));
+  }
+
+  return {
+    content: [
+      { type: "text", text: JSON.stringify([...tags].sort(), null, 2) },
+    ],
+  };
+});
+
+/** Connect transport **/
+const transport = new StdioServerTransport();
+await server.connect(transport);
