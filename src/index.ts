@@ -6,7 +6,10 @@ import fg from "fast-glob";
 import matter from "gray-matter";
 import { z } from "zod";
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 /**
@@ -471,6 +474,38 @@ server.tool(
 
     return {
       content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+/** Resources **/
+
+server.resource(
+  "note",
+  new ResourceTemplate("obsidian://note/{path}", {
+    list: async () => {
+      const files = await listMarkdownFiles();
+      return {
+        resources: files.map((f) => ({
+          uri: `obsidian://note/${f}`,
+          name: f,
+          mimeType: "text/markdown",
+        })),
+      };
+    },
+  }),
+  { mimeType: "text/markdown" },
+  async (uri, variables) => {
+    const rel = String(variables.path);
+    const note = await readNote(rel);
+    return {
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: note.raw,
+        },
+      ],
     };
   },
 );
