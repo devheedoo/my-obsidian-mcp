@@ -510,6 +510,42 @@ server.resource(
   },
 );
 
+/** Prompts **/
+
+server.prompt(
+  "summarize_note",
+  {
+    path: z
+      .string()
+      .describe("Path relative to vault root, e.g. 'Projects/my-project.md'"),
+  },
+  async ({ path: rel }) => {
+    const note = await readNote(rel);
+    return {
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "resource" as const,
+            resource: {
+              uri: `obsidian://note/${rel}`,
+              mimeType: "text/markdown",
+              text: note.raw,
+            },
+          },
+        },
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: "위 노트의 핵심 내용을 간결하게 요약해주세요.",
+          },
+        },
+      ],
+    };
+  },
+);
+
 /** Connect transport **/
 const transport = new StdioServerTransport();
 await server.connect(transport);
