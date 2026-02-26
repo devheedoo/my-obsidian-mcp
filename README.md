@@ -29,7 +29,7 @@ Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian
 
 | URI 패턴                 | 설명                                                                                                                                                             |
 | ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `obsidian://note/{path}` | Resource 노출 대상을 제한합니다. `daily-notes/YYYY-MM-DD-요일.md` 패턴의 문서만 노출됩니다. 일반 노트 조회는 Tool(`get_note`, `search_notes`) 사용을 권장합니다. |
+| `obsidian://note/{path}` | Resource 목록은 `daily-notes` 폴더 바로 아래의 `.md` 파일(`daily-notes/*.md`)만 노출합니다. 일반 노트 조회는 Tool(`get_note`, `search_notes`) 사용을 권장합니다. |
 
 ## Prompts
 
@@ -37,6 +37,52 @@ Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian
 | ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | `summarize_note` | 노트 경로를 받아 해당 노트의 요약을 요청하는 프롬프트 템플릿입니다.                                                                      |
 | `daily_review`   | 특정 날짜(기본: 오늘)의 Daily Note를 읽어 회고를 도와주는 프롬프트 템플릿입니다. 완료 사항, 진행 중 작업, 내일 할 일, 회고를 정리합니다. |
+
+## 활용 사례 (Use Cases)
+
+### 1) 주간 회고 자동 생성 + 메타데이터 정리
+
+- **상황**: 주간 Daily Note를 기반으로 회고 문서를 만들고, 태그/상태를 일관되게 정리하고 싶을 때
+- **미니 플레이북**:
+  1. `list_daily_notes(from,to)`로 주간 대상 수집
+  2. 핵심 노트를 `get_note`로 읽고 요약 초안 생성
+  3. `create_note`로 `Weekly/YYYY-Www.md` 생성
+  4. `update_frontmatter`로 `tags`, `status`, `sourceNotes` 보강
+
+### 2) 프로젝트 상태보드 반자동 갱신
+
+- **상황**: 프로젝트 진행상황이 여러 노트에 흩어져 있어 한 곳에서 보기 어렵고, 주기적으로 상태보드가 필요할 때
+- **미니 플레이북**:
+  1. `search_notes`로 상태 관련 키워드 수집 (`status`, `blocked`, `next` 등)
+  2. 관련 노트들을 `get_note`로 집계
+  3. 보드 노트를 `update_note`로 전체 재생성 (표/섹션)
+  4. 필요 시 `update_frontmatter`로 `updatedAt`, `owner` 반영
+
+### 3) 백링크 기반 지식 그래프 정비
+
+- **상황**: 핵심 노트가 고립되어 있고, 관련 문서 연결을 강화하고 싶을 때
+- **미니 플레이북**:
+  1. `get_backlinks(target)`로 연결 빈약 노트 식별
+  2. `search_notes`로 연관 후보 문서 찾기
+  3. 추천 링크 문장을 생성해서 `append_to_note`로 Related 섹션 보강
+
+### 4) 장애/운영 기록 포스트모템 문서화
+
+- **상황**: Daily Note와 운영 로그에 흩어진 사건 기록을 정형화된 포스트모템으로 남기고 싶을 때
+- **미니 플레이북**:
+  1. `search_notes`로 사건 키워드/에러코드 검색
+  2. 관련 일자 노트를 `get_note`로 수집
+  3. 타임라인/원인/재발방지 템플릿 문서를 `create_note`로 생성
+  4. `update_frontmatter`로 severity, owner, followUpDue 추가
+
+### 5) 태그 기반 월간 큐레이션 노트 작성
+
+- **상황**: 월간 학습/업무 노트 중 특정 태그 주제만 뽑아 digest 형태로 공유하고 싶을 때
+- **미니 플레이북**:
+  1. `list_tags`로 태그 후보 탐색
+  2. `search_notes("#태그")`로 후보 노트 수집
+  3. 요약/선정 이유를 포함한 digest를 `create_note`로 작성
+  4. 다음 달엔 `update_note`로 누적판 갱신
 
 ## 설치
 
