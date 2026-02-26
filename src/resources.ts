@@ -1,4 +1,8 @@
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  McpServer,
+  ResourceTemplate,
+} from "@modelcontextprotocol/sdk/server/mcp.js";
+import fg from "fast-glob";
 
 import { VaultApi } from "./vault.js";
 
@@ -7,7 +11,11 @@ export function registerResources(server: McpServer, vault: VaultApi) {
     "note",
     new ResourceTemplate("obsidian://note/{path}", {
       list: async () => {
-        const files = await vault.listMarkdownFiles();
+        const files = await fg("daily-notes/*.md", {
+          cwd: vault.vaultRoot,
+          onlyFiles: true,
+        });
+
         return {
           resources: files.map((f) => ({
             uri: `obsidian://note/${f}`,
