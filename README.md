@@ -14,6 +14,7 @@ Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian
 | `search_notes` | 키워드로 노트를 검색합니다. ripgrep이 있으면 우선 사용하고, 없으면 JS 스캔으로 폴백합니다. |
 | `get_backlinks` | 특정 페이지를 `[[wikilink]]`로 참조하는 노트 목록을 반환합니다. |
 | `list_tags` | Vault 전체의 태그(frontmatter + 인라인 `#tag`)를 수집하여 반환합니다. |
+| `list_daily_notes` | Daily Note 목록을 조회합니다. `Daily/YYYY-MM-DD.md`, `Daily/YYYY/MM/YYYY-MM-DD.md` 패턴을 모두 지원하며, `from`/`to` 날짜 범위로 필터링할 수 있습니다. |
 
 ### 쓰기
 
@@ -22,6 +23,20 @@ Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian
 | `create_note` | 새 노트를 생성합니다. 이미 존재하는 파일이면 에러를 반환합니다. 중간 디렉토리는 자동 생성됩니다. |
 | `update_note` | 기존 노트를 덮어씁니다. frontmatter를 생략하면 기존 frontmatter가 유지됩니다. |
 | `append_to_note` | 기존 노트 끝에 내용을 추가합니다. |
+| `update_frontmatter` | 기존 노트의 frontmatter를 부분적으로 수정합니다. `updates`로 key-value를 merge하고, `deleteKeys`로 특정 키를 제거할 수 있습니다. |
+
+## Resources
+
+| URI 패턴 | 설명 |
+| --- | --- |
+| `obsidian://note/{path}` | 개별 노트를 MCP Resource로 노출합니다. 클라이언트가 URI로 직접 노트 내용을 참조할 수 있습니다. |
+
+## Prompts
+
+| Prompt | 설명 |
+| --- | --- |
+| `summarize_note` | 노트 경로를 받아 해당 노트의 요약을 요청하는 프롬프트 템플릿입니다. |
+| `daily_review` | 특정 날짜(기본: 오늘)의 Daily Note를 읽어 회고를 도와주는 프롬프트 템플릿입니다. 완료 사항, 진행 중 작업, 내일 할 일, 회고를 정리합니다. |
 
 ## 설치
 
