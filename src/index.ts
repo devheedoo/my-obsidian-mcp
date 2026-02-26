@@ -546,6 +546,77 @@ server.prompt(
   },
 );
 
+async function findDailyNote(date: string): Promise<string | null> {
+  const [yyyy, mm] = date.split("-");
+  const candidates = [
+    `Daily/${date}.md`,
+    `Daily/${yyyy}/${mm}/${date}.md`,
+  ];
+  for (const rel of candidates) {
+    try {
+      await fs.access(path.join(VAULT, rel));
+      return rel;
+    } catch {
+      // try next
+    }
+  }
+  return null;
+}
+
+server.prompt(
+  "daily_review",
+  {
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe("Date in YYYY-MM-DD format. Defaults to today."),
+  },
+  async ({ date }) => {
+    const targetDate =
+      date ?? new Date().toISOString().slice(0, 10);
+    const rel = await findDailyNote(targetDate);
+
+    if (!rel) {
+      return {
+        messages: [
+          {
+            role: "user" as const,
+            content: {
+              type: "text" as const,
+              text: `${targetDate}에 해당하는 Daily Note를 찾을 수 없습니다.`,
+            },
+          },
+        ],
+      };
+    }
+
+    const note = await readNote(rel);
+    return {
+      messages: [
+        {
+          role: "user" as const,
+          content: {
+            type: "resource" as const,
+            resource: {
+              uri: `obsidian://note/${rel}`,
+              mimeType: "text/markdown",
+              text: note.raw,
+            },
+          },
+        },
+        {
+          role: "user" as const,
+          content: {
+            type: "text" as const,
+            text: `위는 ${targetDate}의 Daily Note입니다. 오늘 하루를 돌아보며 다음을 정리해주세요:\n1. 주요 완료 사항\n2. 진행 중인 작업\n3. 내일 할 일 제안\n4. 간단한 회고 한 줄`,
+          },
+        },
+      ],
+    };
+  },
+);
+
 /** Connect transport **/
 const transport = new StdioServerTransport();
 await server.connect(transport);
