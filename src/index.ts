@@ -431,6 +431,50 @@ server.tool(
   },
 );
 
+const DAILY_DATE_RE = /(\d{4}-\d{2}-\d{2})\.md$/;
+
+server.tool(
+  "list_daily_notes",
+  {
+    from: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe("Start date (inclusive), e.g. '2026-01-01'"),
+    to: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional()
+      .describe("End date (inclusive), e.g. '2026-02-28'"),
+    limit: z.number().int().positive().max(500).default(30),
+  },
+  async ({ from, to, limit }) => {
+    const files = await fg(["Daily/**/*.md"], {
+      cwd: VAULT,
+      dot: true,
+      onlyFiles: true,
+    });
+
+    const notes: { path: string; date: string }[] = [];
+
+    for (const f of files) {
+      const m = DAILY_DATE_RE.exec(f);
+      if (!m) continue;
+      const date = m[1];
+      if (from && date < from) continue;
+      if (to && date > to) continue;
+      notes.push({ path: f, date });
+    }
+
+    notes.sort((a, b) => b.date.localeCompare(a.date));
+    const result = notes.slice(0, limit);
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
 /** Connect transport **/
 const transport = new StdioServerTransport();
 await server.connect(transport);
