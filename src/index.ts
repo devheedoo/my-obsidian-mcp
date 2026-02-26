@@ -376,6 +376,61 @@ server.tool(
   },
 );
 
+server.tool(
+  "update_frontmatter",
+  {
+    path: z
+      .string()
+      .describe("Path relative to vault root, e.g. 'Daily/2026-02-26.md'"),
+    updates: z
+      .record(z.string(), z.unknown())
+      .describe("Key-value pairs to merge into the existing frontmatter"),
+    deleteKeys: z
+      .array(z.string())
+      .optional()
+      .describe("Optional list of frontmatter keys to remove"),
+  },
+  async ({ path: rel, updates, deleteKeys }) => {
+    const abs = assertInsideVault(rel);
+
+    try {
+      await fs.access(abs);
+    } catch {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Error: file not found at '${rel}'.`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    const existing = await fs.readFile(abs, "utf8");
+    const parsed = matter(existing);
+    const fm: Record<string, unknown> = { ...parsed.data, ...updates };
+
+    if (deleteKeys) {
+      for (const key of deleteKeys) {
+        delete fm[key];
+      }
+    }
+
+    const text = matter.stringify(parsed.content, fm);
+    await fs.writeFile(abs, text, "utf8");
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Updated frontmatter of: ${rel}\n${JSON.stringify(fm, null, 2)}`,
+        },
+      ],
+    };
+  },
+);
+
 /** Connect transport **/
 const transport = new StdioServerTransport();
 await server.connect(transport);
