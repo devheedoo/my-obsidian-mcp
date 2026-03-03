@@ -7,23 +7,32 @@ Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian
 
 ### 읽기
 
-| Tool               | 설명                                                                                                                                                   |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `list_notes`       | Vault 내 마크다운 파일 목록을 반환합니다. glob 패턴으로 필터링할 수 있습니다.                                                                          |
-| `get_note`         | 특정 노트의 frontmatter와 본문을 반환합니다.                                                                                                           |
-| `search_notes`     | 키워드로 노트를 검색합니다. ripgrep이 있으면 우선 사용하고, 없으면 JS 스캔으로 폴백합니다.                                                             |
-| `get_backlinks`    | 특정 페이지를 `[[wikilink]]`로 참조하는 노트 목록을 반환합니다.                                                                                        |
-| `list_tags`        | Vault 전체의 태그(frontmatter + 인라인 `#tag`)를 수집하여 반환합니다.                                                                                  |
-| `list_daily_notes` | Daily Note 목록을 조회합니다. `Daily/YYYY-MM-DD.md`, `Daily/YYYY/MM/YYYY-MM-DD.md` 패턴을 모두 지원하며, `from`/`to` 날짜 범위로 필터링할 수 있습니다. |
+| Tool               | 인자                                    | 설명                                                                                                        |
+| ------------------ | --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `list_notes`       | `glob?`                                 | Vault 내 마크다운 파일 목록을 반환합니다. glob 패턴으로 필터링할 수 있습니다.                               |
+| `get_note`         | `path`                                  | 특정 노트의 frontmatter와 본문을 반환합니다.                                                                |
+| `get_section`      | `path`, `section`                       | 특정 노트의 `## Section` 하나만 추출하여 반환합니다. 섹션명은 대소문자를 구분하지 않습니다.                 |
+| `search_notes`     | `query`, `limit?`, `caseSensitive?`     | 키워드로 노트를 검색합니다. ripgrep이 있으면 우선 사용하고, 없으면 JS 스캔으로 폴백합니다.                  |
+| `get_backlinks`    | `target`                                | 특정 페이지를 `[[wikilink]]`로 참조하는 노트 목록을 반환합니다.                                             |
+| `list_tags`        | —                                       | Vault 전체의 태그(frontmatter + 인라인 `#tag`)를 수집하여 반환합니다.                                       |
+| `list_daily_notes` | `from?`, `to?`, `limit?`                | Daily Note 목록을 조회합니다. `daily-notes/YYYY-MM-DD-Day.md`, `daily-notes/YYYY/MM/YYYY-MM-DD-Day.md` 패턴을 지원하며, `from`/`to` 날짜 범위로 필터링할 수 있습니다. |
+| `list_todos`       | `from?`, `to?`, `status?`               | Daily Note에서 `- [ ]`/`- [x]` 항목을 파싱하여 반환합니다. `status`는 `all`(기본값)·`pending`·`done`을 지원합니다. 각 항목에 출처 파일, 날짜, 섹션명이 포함됩니다. |
 
 ### 쓰기
 
-| Tool                 | 설명                                                                                                                             |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `create_note`        | 새 노트를 생성합니다. 이미 존재하는 파일이면 에러를 반환합니다. 중간 디렉토리는 자동 생성됩니다.                                 |
-| `update_note`        | 기존 노트를 덮어씁니다. frontmatter를 생략하면 기존 frontmatter가 유지됩니다.                                                    |
-| `append_to_note`     | 기존 노트 끝에 내용을 추가합니다.                                                                                                |
-| `update_frontmatter` | 기존 노트의 frontmatter를 부분적으로 수정합니다. `updates`로 key-value를 merge하고, `deleteKeys`로 특정 키를 제거할 수 있습니다. |
+| Tool                  | 인자                                      | 설명                                                                                                                             |
+| --------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `create_note`         | `path`, `content`, `frontmatter?`         | 새 노트를 생성합니다. 이미 존재하는 파일이면 에러를 반환합니다. 중간 디렉토리는 자동 생성됩니다.                                 |
+| `update_note`         | `path`, `content`, `frontmatter?`         | 기존 노트를 덮어씁니다. frontmatter를 생략하면 기존 frontmatter가 유지됩니다.                                                    |
+| `append_to_note`      | `path`, `content`                         | 기존 노트 끝에 내용을 추가합니다.                                                                                                |
+| `append_to_section`   | `path`, `section`, `content`              | 특정 `## Section` 끝에 내용을 삽입합니다. 섹션이 존재하지 않으면 에러를 반환합니다.                                             |
+| `update_frontmatter`  | `path`, `updates`, `deleteKeys?`          | 기존 노트의 frontmatter를 부분적으로 수정합니다. `updates`로 key-value를 merge하고, `deleteKeys`로 특정 키를 제거할 수 있습니다. |
+
+### Daily Note
+
+| Tool                | 인자    | 설명                                                                                                                                        |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_daily_note` | `date?` | `daily-notes/template.md`를 기반으로 새 Daily Note를 생성합니다. 날짜를 생략하면 오늘 날짜를 사용합니다. 파일명에 요일 접미사(`-Thu`)가 자동으로 추가되며, `{{date}}` 플레이스홀더가 실제 날짜로 치환됩니다. |
 
 ## Resources
 
@@ -44,8 +53,8 @@ Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian
 
 - **상황**: 주간 Daily Note를 기반으로 회고 문서를 만들고, 태그/상태를 일관되게 정리하고 싶을 때
 - **미니 플레이북**:
-  1. `list_daily_notes(from,to)`로 주간 대상 수집
-  2. 핵심 노트를 `get_note`로 읽고 요약 초안 생성
+  1. `list_daily_notes(from, to)`로 주간 대상 수집
+  2. 핵심 노트를 `get_section(path, "TIL")`로 학습 내용만 추출
   3. `create_note`로 `Weekly/YYYY-Www.md` 생성
   4. `update_frontmatter`로 `tags`, `status`, `sourceNotes` 보강
 
@@ -64,7 +73,7 @@ Cursor, Claude Desktop 등 MCP를 지원하는 AI 클라이언트에서 Obsidian
 - **미니 플레이북**:
   1. `get_backlinks(target)`로 연결 빈약 노트 식별
   2. `search_notes`로 연관 후보 문서 찾기
-  3. 추천 링크 문장을 생성해서 `append_to_note`로 Related 섹션 보강
+  3. 추천 링크 문장을 생성해서 `append_to_section(path, "Related")`로 섹션에 보강
 
 ### 4) 장애/운영 기록 포스트모템 문서화
 
@@ -157,3 +166,4 @@ npm start -- /path/to/your/ObsidianVault
 - **fast-glob** — 파일 탐색
 - **gray-matter** — frontmatter 파싱
 - **zod** — 입력 스키마 검증
+- **vitest** — 단위/통합 테스트 (`npm test`)
