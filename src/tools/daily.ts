@@ -7,7 +7,7 @@ import { listDailyNotesArgs } from "./schemas.js";
 
 export function registerDailyTools(server: McpServer, vault: VaultApi) {
   server.tool("list_daily_notes", listDailyNotesArgs, async ({ from, to, limit }): Promise<ToolResult> => {
-      const files = await fg(["Daily/**/*.md"], {
+      const files = await fg(["daily-notes/**/*.md"], {
         cwd: vault.vaultRoot,
         dot: true,
         onlyFiles: true,

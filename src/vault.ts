@@ -13,7 +13,7 @@ export type NoteData = {
   raw: string;
 };
 
-export const DAILY_DATE_RE = /(\d{4}-\d{2}-\d{2})\.md$/;
+export const DAILY_DATE_RE = /(\d{4}-\d{2}-\d{2})(?:-[A-Za-z0-9]+)*\.md$/;
 
 export function extractWikiLinks(markdown: string): string[] {
   // [[Page]] or [[Page|Alias]]
@@ -40,6 +40,7 @@ export type VaultApi = {
   readNote: (relPath: string) => Promise<NoteData>;
   buildNoteContent: (content: string, frontmatter?: Frontmatter) => string;
   findDailyNote: (date: string) => Promise<string | null>;
+  findDailyNotes: (date: string) => Promise<string[]>;
 };
 
 export function createVaultApi(vaultRoot: string): VaultApi {
@@ -76,20 +77,22 @@ export function createVaultApi(vaultRoot: string): VaultApi {
     return content;
   }
 
-  async function findDailyNote(date: string): Promise<string | null> {
+  async function findDailyNotes(date: string): Promise<string[]> {
     const [yyyy, mm] = date.split("-");
-    const candidates = [`Daily/${date}.md`, `Daily/${yyyy}/${mm}/${date}.md`];
+    const patterns = [
+      `daily-notes/${date}-*.md`,
+      `daily-notes/${yyyy}/${mm}/${date}-*.md`,
+    ];
+    const files = await fg(patterns, {
+      cwd: vaultRoot,
+      onlyFiles: true,
+    });
+    return files.sort();
+  }
 
-    for (const rel of candidates) {
-      try {
-        await fs.access(assertInsideVault(rel));
-        return rel;
-      } catch {
-        // try next
-      }
-    }
-
-    return null;
+  async function findDailyNote(date: string): Promise<string | null> {
+    const files = await findDailyNotes(date);
+    return files[0] ?? null;
   }
 
   return {
@@ -99,5 +102,6 @@ export function createVaultApi(vaultRoot: string): VaultApi {
     readNote,
     buildNoteContent,
     findDailyNote,
+    findDailyNotes,
   };
 }
