@@ -4,9 +4,10 @@ import path from "node:path";
 import matter from "gray-matter";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { VaultApi } from "../vault.js";
+import { VaultApi, appendToSection } from "../vault.js";
 import {
   appendToNoteArgs,
+  appendToSectionArgs,
   createNoteArgs,
   updateFrontmatterArgs,
   updateNoteArgs,
@@ -88,6 +89,32 @@ export function registerWriteTools(server: McpServer, vault: VaultApi) {
       await fs.writeFile(abs, existing + separator + content, "utf8");
 
       return textResult(`Appended to: ${rel}`);
+    },
+  );
+
+  server.tool(
+    "append_to_section",
+    appendToSectionArgs,
+    async ({ path: rel, section, content }): Promise<ToolResult> => {
+      const abs = vault.assertInsideVault(rel);
+
+      try {
+        await fs.access(abs);
+      } catch {
+        return errorResult(
+          `Error: file not found at '${rel}'.`,
+        );
+      }
+
+      const existing = await fs.readFile(abs, "utf8");
+
+      try {
+        const updated = appendToSection(existing, section, content);
+        await fs.writeFile(abs, updated, "utf8");
+        return textResult(`Appended to section "## ${section}" in: ${rel}`);
+      } catch (e) {
+        return errorResult(`Error: ${(e as Error).message}`);
+      }
     },
   );
 

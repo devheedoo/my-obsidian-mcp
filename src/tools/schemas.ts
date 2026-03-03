@@ -95,3 +95,9 @@ export const getSectionArgs = {
   path: notePathSchema,
   section: sectionNameSchema,
 };
+
+export const appendToSectionArgs = {
+  path: notePathSchema,
+  section: sectionNameSchema,
+  content: z.string().describe("Markdown content to append to the section"),
+};
