@@ -101,3 +101,16 @@ export const appendToSectionArgs = {
   section: sectionNameSchema,
   content: z.string().describe("Markdown content to append to the section"),
 };
+
+export const listTodosArgs = {
+  from: dailyDateSchema
+    .optional()
+    .describe("Start date (inclusive), e.g. '2026-01-01'"),
+  to: dailyDateSchema
+    .optional()
+    .describe("End date (inclusive), e.g. '2026-02-28'"),
+  status: z
+    .enum(["all", "pending", "done"])
+    .default("all")
+    .describe("Filter by todo status: 'all', 'pending' (unchecked), or 'done' (checked)"),
+};

@@ -4,9 +4,9 @@ import path from "node:path";
 import fg from "fast-glob";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { DAILY_DATE_RE, VaultApi } from "../vault.js";
+import { DAILY_DATE_RE, VaultApi, parseNoteSections } from "../vault.js";
 import { ToolResult, errorResult, jsonResult, textResult } from "./response.js";
-import { createDailyNoteArgs, listDailyNotesArgs } from "./schemas.js";
+import { createDailyNoteArgs, listDailyNotesArgs, listTodosArgs } from "./schemas.js";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const TEMPLATE_PATH = "daily-notes/template.md";
@@ -64,6 +64,45 @@ export function registerDailyTools(server: McpServer, vault: VaultApi) {
       await fs.writeFile(abs, content, "utf8");
 
       return textResult(`Created daily note: ${rel}`);
+    },
+  );
+
+  server.tool("list_todos", listTodosArgs, async ({ from, to, status }): Promise<ToolResult> => {
+      const files = await fg(["daily-notes/**/*.md"], {
+        cwd: vault.vaultRoot,
+        dot: true,
+        onlyFiles: true,
+      });
+
+      const TODO_RE = /^(\s*)- \[([ xX])\] (.+)$/;
+      const todos: { file: string; date: string; section: string; text: string; done: boolean }[] = [];
+
+      for (const f of files) {
+        const m = DAILY_DATE_RE.exec(f);
+        if (!m) continue;
+        const date = m[1];
+        if (from && date < from) continue;
+        if (to && date > to) continue;
+
+        const abs = vault.assertInsideVault(f);
+        const raw = await fs.readFile(abs, "utf8");
+        const sections = parseNoteSections(raw);
+
+        for (const sec of sections) {
+          for (const line of sec.content.split("\n")) {
+            const tm = TODO_RE.exec(line);
+            if (!tm) continue;
+            const done = tm[2] !== " ";
+            if (status === "pending" && done) continue;
+            if (status === "done" && !done) continue;
+            todos.push({ file: f, date, section: sec.name, text: tm[3], done });
+          }
+        }
+      }
+
+      todos.sort((a, b) => b.date.localeCompare(a.date));
+
+      return jsonResult(todos);
     },
   );
 }
