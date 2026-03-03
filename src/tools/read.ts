@@ -5,14 +5,15 @@ import matter from "gray-matter";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { searchNotesText } from "../services/search.js";
-import { VaultApi, extractInlineTags, extractWikiLinks } from "../vault.js";
+import { VaultApi, extractInlineTags, extractWikiLinks, parseNoteSections } from "../vault.js";
 import {
   getBacklinksArgs,
   getNoteArgs,
+  getSectionArgs,
   listNotesArgs,
   searchNotesArgs,
 } from "./schemas.js";
-import { ToolResult, jsonResult, textResult } from "./response.js";
+import { ToolResult, errorResult, jsonResult, textResult } from "./response.js";
 
 export function registerReadTools(server: McpServer, vault: VaultApi) {
   server.tool(
@@ -62,6 +63,22 @@ export function registerReadTools(server: McpServer, vault: VaultApi) {
       }
 
       return jsonResult(backlinks);
+    },
+  );
+
+  server.tool("get_section", getSectionArgs, async ({ path: rel, section }): Promise<ToolResult> => {
+      const note = await vault.readNote(rel);
+      const sections = parseNoteSections(note.raw);
+      const found = sections.find(
+        (s) => s.name.toLowerCase() === section.toLowerCase(),
+      );
+      if (!found) {
+        const available = sections.filter((s) => s.name !== "_preamble").map((s) => s.name);
+        return errorResult(
+          `Section "## ${section}" not found. Available sections: ${available.join(", ")}`,
+        );
+      }
+      return jsonResult({ section: found.name, content: found.content });
     },
   );
 

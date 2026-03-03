@@ -86,3 +86,12 @@ export const createDailyNoteArgs = {
     .optional()
     .describe("Date in YYYY-MM-DD format. Defaults to today."),
 };
+
+export const sectionNameSchema = z
+  .string()
+  .describe("Section heading name, e.g. 'Work', 'TIL', 'Log', 'Personal', 'Retro'");
+
+export const getSectionArgs = {
+  path: notePathSchema,
+  section: sectionNameSchema,
+};
