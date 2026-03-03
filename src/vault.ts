@@ -33,6 +33,94 @@ export function extractInlineTags(markdown: string): string[] {
   return [...out];
 }
 
+export type NoteSection = {
+  name: string;
+  content: string;
+};
+
+/**
+ * Split note body (after frontmatter) into sections by `## Heading` lines.
+ * Trailing `---` separators at the end of each section are trimmed.
+ */
+export function parseNoteSections(raw: string): NoteSection[] {
+  const parsed = matter(raw);
+  const body = parsed.content;
+  const lines = body.split("\n");
+  const sections: NoteSection[] = [];
+
+  let currentName = "_preamble";
+  let currentLines: string[] = [];
+
+  for (const line of lines) {
+    const heading = /^## (.+)$/.exec(line);
+    if (heading) {
+      sections.push({ name: currentName, content: trimSeparator(currentLines) });
+      currentName = heading[1].trim();
+      currentLines = [];
+    } else {
+      currentLines.push(line);
+    }
+  }
+
+  sections.push({ name: currentName, content: trimSeparator(currentLines) });
+  return sections;
+}
+
+function trimSeparator(lines: string[]): string {
+  let end = lines.length;
+  while (end > 0 && lines[end - 1].trim() === "") end--;
+  if (end > 0 && lines[end - 1].trim() === "---") end--;
+  while (end > 0 && lines[end - 1].trim() === "") end--;
+  return lines.slice(0, end).join("\n").trim();
+}
+
+/**
+ * Append content to a specific `## Section` in a note.
+ * Works on raw text (preserving frontmatter).
+ * Returns the modified raw text.
+ */
+export function appendToSection(
+  raw: string,
+  sectionName: string,
+  contentToAppend: string,
+): string {
+  const lines = raw.split("\n");
+  const sectionStart = lines.findIndex(
+    (l) => /^## (.+)$/.exec(l)?.[1]?.trim() === sectionName,
+  );
+  if (sectionStart === -1) {
+    throw new Error(`Section "## ${sectionName}" not found`);
+  }
+
+  let sectionEnd = lines.length;
+  for (let i = sectionStart + 1; i < lines.length; i++) {
+    if (/^---$/.test(lines[i].trim()) || /^## /.test(lines[i])) {
+      sectionEnd = i;
+      break;
+    }
+  }
+
+  const before = lines.slice(0, sectionEnd);
+  const after = lines.slice(sectionEnd);
+
+  const lastContentLine = before.length - 1;
+  let insertAt = lastContentLine + 1;
+  while (insertAt > sectionStart + 1 && before[insertAt - 1].trim() === "") {
+    insertAt--;
+  }
+
+  const result = [
+    ...before.slice(0, insertAt),
+    ...(insertAt > sectionStart + 1 ? [""] : [""]),
+    ...contentToAppend.split("\n"),
+    "",
+    ...before.slice(insertAt),
+    ...after,
+  ];
+
+  return result.join("\n");
+}
+
 export type VaultApi = {
   vaultRoot: string;
   assertInsideVault: (p: string) => string;
