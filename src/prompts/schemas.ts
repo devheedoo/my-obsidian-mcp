@@ -3,7 +3,7 @@ import { z } from "zod";
 export const summarizeNotePromptArgs = {
   path: z
     .string()
-    .describe("Path relative to vault root, e.g. 'Projects/my-project.md'"),
+    .describe("Path relative to vault root, e.g. 'daily-notes/2026-02-26-Thu.md'"),
 };
 
 export const dailyReviewPromptArgs = {

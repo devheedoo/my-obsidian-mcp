@@ -2,12 +2,12 @@ import { z } from "zod";
 
 export const notePathSchema = z
   .string()
-  .describe("Path relative to vault root, e.g. 'Daily/2026-02-26.md'");
+  .describe("Path relative to vault root, e.g. 'daily-notes/2026-02-26-Thu.md'");
 
 export const createNotePathSchema = z
   .string()
   .describe(
-    "Path relative to vault root, e.g. 'Daily/2026-02-26.md'. Must end with .md",
+    "Path relative to vault root, e.g. 'daily-notes/2026-02-26-Thu.md'. Must end with .md",
   );
 
 export const dailyDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
