@@ -80,3 +80,9 @@ export const listDailyNotesArgs = {
     .describe("End date (inclusive), e.g. '2026-02-28'"),
   limit: z.number().int().positive().max(500).default(30),
 };
+
+export const createDailyNoteArgs = {
+  date: dailyDateSchema
+    .optional()
+    .describe("Date in YYYY-MM-DD format. Defaults to today."),
+};
